@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ripple</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; }
+        h1 { text-align: center; color: #343a40; }
+        textarea { width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; }
+        button { display: block; width: 100%; padding: 12px; font-size: 18px; color: #fff; background-color: #007bff; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; }
+        button:hover { background-color: #0056b3; }
+        #results { margin-top: 30px; }
+        .post { background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px; }
+        .post h3 { margin-top: 0; color: #495057; }
+        .post p { white-space: pre-wrap; }
+        .post .hashtags { color: #6c757d; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>💧 Ripple</h1>
+    <p>Paste your article, blog post, or text below to generate social media posts.</p>
+    
+    <textarea id="articleText" placeholder="Paste your text here..."></textarea>
+    <button id="generateBtn">Generate Posts</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const articleTextEl = document.getElementById('articleText');
+        const generateBtnEl = document.getElementById('generateBtn');
+        const resultsEl = document.getElementById('results');
+
+        generateBtnEl.addEventListener('click', async () => {
+            const text = articleTextEl.value;
+            if (!text.trim()) {
+                alert('Please paste some text into the box.');
+                return;
+            }
+
+            // Show a loading state
+            resultsEl.innerHTML = '<p>Generating your posts, please wait...</p>';
+            generateBtnEl.disabled = true;
+
+            try {
+                // Use the fetch API to call our backend
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text }),
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    displayPosts(data.posts);
+                } else {
+                    resultsEl.innerHTML = `<p style="color: red;">Error: ${data.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Failed to fetch:', error);
+                resultsEl.innerHTML = '<p style="color: red;">A network error occurred. Is the server running?</p>';
+            } finally {
+                generateBtnEl.disabled = false;
+            }
+        });
+
+        function displayPosts(posts) {
+            resultsEl.innerHTML = ''; // Clear loading message
+            posts.forEach(post => {
+                const postDiv = document.createElement('div');
+                postDiv.className = 'post';
+                
+                const platform = `<h3>${post.platform}</h3>`;
+                const content = `<p>${post.content}</p>`;
+                const hashtags = `<p class="hashtags">${post.hashtags.map(h => `#${h}`).join(' ')}</p>`;
+                
+                postDiv.innerHTML = platform + content + hashtags;
+                resultsEl.appendChild(postDiv);
+            });
+        }
+    </script>
+</body>
+</html>
