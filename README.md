@@ -5,7 +5,7 @@ Ripple is a micro-SaaS that takes a long-form piece of text (like an article or 
 
 ---
 
-### Current Status: Functional MVP
+## Current Status: Functional MVP
 
 The project is currently a functional Minimum Viable Product (MVP).
 
