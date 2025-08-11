@@ -22,3 +22,6 @@ class UserPublic(SQLModel):
     id: int
     email: str
     created_at: datetime
+
+class Article(SQLModel):
+    text: str
