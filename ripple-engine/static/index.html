@@ -5,82 +5,219 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ripple</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; }
-        h1 { text-align: center; color: #343a40; }
-        textarea { width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; color: #343a40; }
+        h1, h2 { text-align: center; }
+        .container { display: none; } /* Hide containers by default */
+        .visible { display: block; }
+        input { width: 95%; padding: 10px; margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; }
+        textarea { width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
         button { display: block; width: 100%; padding: 12px; font-size: 18px; color: #fff; background-color: #007bff; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; }
         button:hover { background-color: #0056b3; }
+        #logoutBtn { background-color: #6c757d; }
+        #logoutBtn:hover { background-color: #5a6268; }
         #results { margin-top: 30px; }
         .post { background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px; }
-        .post h3 { margin-top: 0; color: #495057; }
+        .post h3 { margin-top: 0; }
         .post p { white-space: pre-wrap; }
         .post .hashtags { color: #6c757d; font-style: italic; }
+        #auth-container { max-width: 400px; margin: auto; }
+        #message-area { text-align: center; color: green; font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>💧 Ripple</h1>
-    <p>Paste your article, blog post, or text below to generate social media posts.</p>
-    
-    <textarea id="articleText" placeholder="Paste your text here..."></textarea>
-    <button id="generateBtn">Generate Posts</button>
-    
-    <div id="results"></div>
+    <div id="message-area"></div>
 
-    <script>
-        const articleTextEl = document.getElementById('articleText');
-        const generateBtnEl = document.getElementById('generateBtn');
+    <div id="auth-container" class="container">
+        <h2>Login</h2>
+        <form id="login-form">
+            <input type="email" id="login-email" placeholder="Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <hr>
+        <h2>Register</h2>
+        <form id="register-form">
+            <input type="email" id="register-email" placeholder="Email" required>
+            <input type="password" id="register-password" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+    </div>
+
+    <div id="app-container" class="container">
+        <p>Paste your article, blog post, or text below to generate social media posts.</p>
+        <textarea id="articleText" placeholder="Paste your text here..."></textarea>
+        <button id="generateBtn">Generate Posts</button>
+        <button id="logoutBtn">Logout</button>
+        <div id="results"></div>
+    </div>
+
+<script>
+    // --- DOM Elements ---
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const messageArea = document.getElementById('message-area');
+    
+    // --- Event Listeners ---
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('register-form').addEventListener('submit', handleRegister);
+    document.getElementById('generateBtn').addEventListener('click', handleGenerate);
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+    // --- Core Functions ---
+
+    /**
+     * This function runs on page load to check if the user is already logged in.
+     */
+    function checkLoginState() {
+        const token = localStorage.getItem('ripple_access_token');
+        if (token) {
+            authContainer.classList.remove('visible');
+            appContainer.classList.add('visible');
+        } else {
+            authContainer.classList.add('visible');
+            appContainer.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Handles the login form submission.
+     */
+    async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+
+        // Note: The /token endpoint expects form data, not JSON.
+        const formData = new URLSearchParams();
+        formData.append('username', email);
+        formData.append('password', password);
+
+        try {
+            const response = await fetch('/token', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Login failed. Please check your credentials.');
+            
+            const data = await response.json();
+            localStorage.setItem('ripple_access_token', data.access_token);
+            showMessage('Login successful!', 'green');
+            checkLoginState(); // Switch to the app view
+        } catch (error) {
+            showMessage(error.message, 'red');
+        }
+    }
+
+    /**
+     * Handles the registration form submission.
+     */
+    async function handleRegister(e) {
+        e.preventDefault();
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+
+        try {
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Registration failed.');
+            }
+            showMessage('Registration successful! Please log in.', 'green');
+            document.getElementById('register-form').reset();
+        } catch (error) {
+            showMessage(error.message, 'red');
+        }
+    }
+
+    /**
+     * Handles the logout button click.
+     */
+    function handleLogout() {
+        localStorage.removeItem('ripple_access_token');
+        showMessage('You have been logged out.', 'green');
+        checkLoginState(); // Switch to the auth view
+    }
+
+    /**
+     * Handles the "Generate Posts" button click, now with authentication.
+     */
+    async function handleGenerate() {
+        const text = document.getElementById('articleText').value;
+        const token = localStorage.getItem('ripple_access_token');
         const resultsEl = document.getElementById('results');
 
-        generateBtnEl.addEventListener('click', async () => {
-            const text = articleTextEl.value;
-            if (!text.trim()) {
-                alert('Please paste some text into the box.');
-                return;
-            }
-
-            // Show a loading state
-            resultsEl.innerHTML = '<p>Generating your posts, please wait...</p>';
-            generateBtnEl.disabled = true;
-
-            try {
-                // Use the fetch API to call our backend
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ text: text }),
-                });
-
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    displayPosts(data.posts);
-                } else {
-                    resultsEl.innerHTML = `<p style="color: red;">Error: ${data.message}</p>`;
-                }
-            } catch (error) {
-                console.error('Failed to fetch:', error);
-                resultsEl.innerHTML = '<p style="color: red;">A network error occurred. Is the server running?</p>';
-            } finally {
-                generateBtnEl.disabled = false;
-            }
-        });
-
-        function displayPosts(posts) {
-            resultsEl.innerHTML = ''; // Clear loading message
-            posts.forEach(post => {
-                const postDiv = document.createElement('div');
-                postDiv.className = 'post';
-                
-                const platform = `<h3>${post.platform}</h3>`;
-                const content = `<p>${post.content}</p>`;
-                const hashtags = `<p class="hashtags">${post.hashtags.map(h => `#${h}`).join(' ')}</p>`;
-                
-                postDiv.innerHTML = platform + content + hashtags;
-                resultsEl.appendChild(postDiv);
-            });
+        if (!text.trim()) {
+            alert('Please paste some text into the box.');
+            return;
         }
-    </script>
+        if (!token) {
+            showMessage('You must be logged in to generate posts.', 'red');
+            handleLogout(); // Log them out if token is missing
+            return;
+        }
+
+        resultsEl.innerHTML = '<p>Generating your posts, please wait...</p>';
+        
+        try {
+            // **THIS IS THE KEY FIX**: We now add the Authorization header.
+            const response = await fetch('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (response.status === 401) throw new Error('Your session has expired. Please log in again.');
+            if (!response.ok) throw new Error('An error occurred while generating posts.');
+
+            const data = await response.json();
+            displayPosts(data.posts);
+        } catch (error) {
+            showMessage(error.message, 'red');
+            if (error.message.includes('session has expired')) {
+                handleLogout();
+            }
+        }
+    }
+
+    /**
+     * Renders the generated posts to the page.
+     */
+    function displayPosts(posts) {
+        const resultsEl = document.getElementById('results');
+        resultsEl.innerHTML = ''; // Clear loading message
+        posts.forEach(post => {
+            const postDiv = document.createElement('div');
+            postDiv.className = 'post';
+            
+            const platform = `<h3>${post.platform}</h3>`;
+            const content = `<p>${post.content}</p>`;
+            const hashtags = `<p class="hashtags">${post.hashtags.map(h => `#${h}`).join(' ')}</p>`;
+            
+            postDiv.innerHTML = platform + content + hashtags;
+            resultsEl.appendChild(postDiv);
+        });
+    }
+
+    /**
+     * A helper to display messages to the user.
+     */
+    function showMessage(message, color) {
+        messageArea.textContent = message;
+        messageArea.style.color = color;
+        setTimeout(() => { messageArea.textContent = ''; }, 3000);
+    }
+
+    // --- Initial Page Load ---
+    checkLoginState();
+
+</script>
 </body>
 </html>
