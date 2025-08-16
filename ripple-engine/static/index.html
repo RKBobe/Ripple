@@ -1,74 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ripple</title>
+    <title>💧 Ripple</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; color: #343a40; }
-        h1, h2 { text-align: center; }
-        .container { display: none; } /* Hide containers by default */
-        .visible { display: block; }
-        input { width: 95%; padding: 10px; margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; }
-        textarea { width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
-        button { display: block; width: 100%; padding: 12px; font-size: 18px; color: #fff; background-color: #007bff; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; }
-        button:hover { background-color: #0056b3; }
-        #logoutBtn { background-color: #6c757d; }
-        #logoutBtn:hover { background-color: #5a6268; }
-        #results { margin-top: 30px; }
-        .post { background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 15px; }
-        .post h3 { margin-top: 0; }
-        .post p { white-space: pre-wrap; }
-        .post .hashtags { color: #6c757d; font-style: italic; }
-        #auth-container { max-width: 400px; margin: auto; }
-        #message-area { text-align: center; color: green; font-weight: bold; }
+        /* A few custom tweaks */
+        body {
+            padding-top: 2rem;
+        }
+        .container {
+            max-width: 800px;
+        }
+        #app-container, #auth-container {
+            display: none; /* Hide containers by default */
+        }
+        .visible {
+            display: block;
+        }
+        .post {
+            margin-bottom: 1.5rem;
+        }
+        .post footer {
+            color: var(--pico-secondary);
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+        #message-area {
+            text-align: center;
+            min-height: 24px;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
-    <h1>💧 Ripple</h1>
-    <div id="message-area"></div>
+    <main class="container">
+        <header>
+            <h1 style="text-align: center;">💧 Ripple</h1>
+            <p style="text-align: center;">Generate social media posts from any text using AI.</p>
+        </header>
 
-    <div id="auth-container" class="container">
-        <h2>Login</h2>
-        <form id="login-form">
-            <input type="email" id="login-email" placeholder="Email" required>
-            <input type="password" id="login-password" placeholder="Password" required>
-            <button type="submit">Login</button>
-        </form>
-        <hr>
-        <h2>Register</h2>
-        <form id="register-form">
-            <input type="email" id="register-email" placeholder="Email" required>
-            <input type="password" id="register-password" placeholder="Password" required>
-            <button type="submit">Register</button>
-        </form>
-    </div>
+        <div id="message-area"></div>
 
-    <div id="app-container" class="container">
-        <p>Paste your article, blog post, or text below to generate social media posts.</p>
-        <textarea id="articleText" placeholder="Paste your text here..."></textarea>
-        <button id="generateBtn">Generate Posts</button>
-        <button id="logoutBtn">Logout</button>
-        <div id="results"></div>
-    </div>
+        <div id="auth-container" class="container">
+            <article>
+                <h2 style="text-align: center;">Login</h2>
+                <form id="login-form">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit" id="loginBtn">Login</button>
+                </form>
+            </article>
+            <article>
+                <h2 style="text-align: center;">Register</h2>
+                <form id="register-form">
+                    <input type="email" id="register-email" placeholder="Email" required>
+                    <input type="password" id="register-password" placeholder="Password" required>
+                    <button type="submit" id="registerBtn">Register</button>
+                </form>
+            </article>
+        </div>
+
+        <div id="app-container" class="container">
+            <textarea id="articleText" placeholder="Paste your article or blog post here..."></textarea>
+            <div class="grid">
+                <button id="generateBtn">Generate Posts</button>
+                <button id="logoutBtn" class="secondary">Logout</button>
+            </div>
+            <section id="results"></section>
+        </div>
+    </main>
 
 <script>
     // --- DOM Elements ---
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
     const messageArea = document.getElementById('message-area');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const generateBtn = document.getElementById('generateBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
     
     // --- Event Listeners ---
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('register-form').addEventListener('submit', handleRegister);
-    document.getElementById('generateBtn').addEventListener('click', handleGenerate);
+    loginForm.addEventListener('submit', handleLogin);
+    registerForm.addEventListener('submit', handleRegister);
+    generateBtn.addEventListener('click', handleGenerate);
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 
     // --- Core Functions ---
 
-    /**
-     * This function runs on page load to check if the user is already logged in.
-     */
     function checkLoginState() {
         const token = localStorage.getItem('ripple_access_token');
         if (token) {
@@ -80,40 +102,31 @@
         }
     }
 
-    /**
-     * Handles the login form submission.
-     */
     async function handleLogin(e) {
         e.preventDefault();
+        setButtonLoadingState(loginBtn, true);
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
-
-        // Note: The /token endpoint expects form data, not JSON.
-        const formData = new URLSearchParams();
-        formData.append('username', email);
-        formData.append('password', password);
+        const formData = new URLSearchParams({ username: email, password: password });
 
         try {
-            const response = await fetch('/token', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await fetch('/token', { method: 'POST', body: formData });
             if (!response.ok) throw new Error('Login failed. Please check your credentials.');
             
             const data = await response.json();
             localStorage.setItem('ripple_access_token', data.access_token);
             showMessage('Login successful!', 'green');
-            checkLoginState(); // Switch to the app view
+            checkLoginState();
         } catch (error) {
             showMessage(error.message, 'red');
+        } finally {
+            setButtonLoadingState(loginBtn, false);
         }
     }
 
-    /**
-     * Handles the registration form submission.
-     */
     async function handleRegister(e) {
         e.preventDefault();
+        setButtonLoadingState(registerBtn, true);
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
 
@@ -128,24 +141,20 @@
                 throw new Error(errorData.detail || 'Registration failed.');
             }
             showMessage('Registration successful! Please log in.', 'green');
-            document.getElementById('register-form').reset();
+            registerForm.reset();
         } catch (error) {
             showMessage(error.message, 'red');
+        } finally {
+            setButtonLoadingState(registerBtn, false);
         }
     }
 
-    /**
-     * Handles the logout button click.
-     */
     function handleLogout() {
         localStorage.removeItem('ripple_access_token');
         showMessage('You have been logged out.', 'green');
-        checkLoginState(); // Switch to the auth view
+        checkLoginState();
     }
 
-    /**
-     * Handles the "Generate Posts" button click, now with authentication.
-     */
     async function handleGenerate() {
         const text = document.getElementById('articleText').value;
         const token = localStorage.getItem('ripple_access_token');
@@ -157,20 +166,18 @@
         }
         if (!token) {
             showMessage('You must be logged in to generate posts.', 'red');
-            handleLogout(); // Log them out if token is missing
+            handleLogout();
             return;
         }
-
-        resultsEl.innerHTML = '<p>Generating your posts, please wait...</p>';
+        
+        // 3. Improved User Feedback
+        setButtonLoadingState(generateBtn, true);
+        resultsEl.innerHTML = `<article aria-busy="true">Generating your posts, please wait...</article>`;
         
         try {
-            // **THIS IS THE KEY FIX**: We now add the Authorization header.
             const response = await fetch('/generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ text })
             });
 
@@ -180,44 +187,45 @@
             const data = await response.json();
             displayPosts(data.posts);
         } catch (error) {
+            resultsEl.innerHTML = '';
             showMessage(error.message, 'red');
             if (error.message.includes('session has expired')) {
                 handleLogout();
             }
+        } finally {
+            setButtonLoadingState(generateBtn, false);
         }
     }
 
-    /**
-     * Renders the generated posts to the page.
-     */
     function displayPosts(posts) {
         const resultsEl = document.getElementById('results');
-        resultsEl.innerHTML = ''; // Clear loading message
+        resultsEl.innerHTML = '';
         posts.forEach(post => {
-            const postDiv = document.createElement('div');
-            postDiv.className = 'post';
+            const postArticle = document.createElement('article');
+            postArticle.className = 'post';
             
             const platform = `<h3>${post.platform}</h3>`;
             const content = `<p>${post.content}</p>`;
-            const hashtags = `<p class="hashtags">${post.hashtags.map(h => `#${h}`).join(' ')}</p>`;
+            const hashtags = `<footer>${post.hashtags.map(h => `#${h}`).join(' ')}</footer>`;
             
-            postDiv.innerHTML = platform + content + hashtags;
-            resultsEl.appendChild(postDiv);
+            postArticle.innerHTML = platform + content + hashtags;
+            resultsEl.appendChild(postArticle);
         });
     }
 
-    /**
-     * A helper to display messages to the user.
-     */
     function showMessage(message, color) {
         messageArea.textContent = message;
-        messageArea.style.color = color;
-        setTimeout(() => { messageArea.textContent = ''; }, 3000);
+        messageArea.style.color = color === 'red' ? 'var(--pico-del-color)' : 'var(--pico-success-color)';
+        setTimeout(() => { messageArea.textContent = ''; }, 4000);
+    }
+    
+    function setButtonLoadingState(button, isLoading) {
+        button.disabled = isLoading;
+        button.setAttribute('aria-busy', isLoading);
     }
 
     // --- Initial Page Load ---
     checkLoginState();
-
 </script>
 </body>
 </html>
