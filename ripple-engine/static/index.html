@@ -8,12 +8,11 @@
     <style>
         body { padding-top: 2rem; }
         .container { max-width: 800px; }
-        /* Use 'display' for more reliable view switching */
         #app-container, #auth-container, #history-container { display: none; }
         .post, .history-item { margin-bottom: 1.5rem; }
         .post footer, .history-item footer { color: var(--pico-secondary); font-style: italic; font-size: 0.9rem; }
         #message-area { text-align: center; min-height: 24px; margin-bottom: 1rem; }
-        .platform-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .platform-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
     </style>
 </head>
 <body>
@@ -48,15 +47,17 @@
             <textarea id="articleText" placeholder="Paste your article or blog post here..."></textarea>
             
             <fieldset class="platform-checks">
-                <label><input type="checkbox" name="platform" value="Twitter"> Twitter</label>
-                <label><input type="checkbox" name="platform" value="LinkedIn"> LinkedIn</label>
                 <label><input type="checkbox" name="platform" value="Facebook"> Facebook</label>
-                <label><input type="checkbox" name="platform" value="Pinterest"> Pinterest</label>
-                <label><input type="checkbox" name="platform" value="Reddit"> Reddit</label>
+                <label><input type="checkbox" name="platform" value="Instagram"> Instagram</label>
+                <label><input type="checkbox" name="platform" value="Twitter"> Twitter (Pro ✨)</label>
+                <label><input type="checkbox" name="platform" value="LinkedIn"> LinkedIn (Pro ✨)</label>
+                <label><input type="checkbox" name="platform" value="Pinterest"> Pinterest (Pro ✨)</label>
+                <label><input type="checkbox" name="platform" value="Reddit"> Reddit (Pro ✨)</label>
             </fieldset>
 
             <div class="grid">
                 <button id="generateBtn">Generate Posts</button>
+                <button id="upgradeBtn" class="contrast">Upgrade to Pro</button>
                 <button id="historyBtn" class="secondary outline">View History</button>
                 <button id="logoutBtn" class="secondary">Logout</button>
             </div>
@@ -93,6 +94,7 @@
         document.getElementById('logoutBtn').addEventListener('click', handleLogout);
         document.getElementById('historyBtn').addEventListener('click', handleViewHistory);
         document.getElementById('backToAppBtn').addEventListener('click', () => toggleView('app'));
+        document.getElementById('upgradeBtn').addEventListener('click', handleUpgrade); // New listener
 
         // --- View Management ---
         function toggleView(view) {
@@ -108,32 +110,43 @@
         function checkLoginState() {
             const token = localStorage.getItem('ripple_access_token');
             toggleView(token ? 'app' : 'auth');
+            // Check for checkout status from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('checkout_status')) {
+                const status = urlParams.get('checkout_status');
+                if (status === 'success') {
+                    showMessage('Upgrade successful! Welcome to Pro.', 'green');
+                } else {
+                    showMessage('Upgrade canceled. You can upgrade anytime.', 'red');
+                }
+                // Clean the URL
+                window.history.replaceState({}, document.title, "/");
+            }
         }
         
         // --- API & Event Handlers ---
         async function handleGenerate() {
+            // ... (this function is unchanged)
             const text = document.getElementById('articleText').value;
             const selectedPlatforms = Array.from(document.querySelectorAll('input[name="platform"]:checked')).map(cb => cb.value);
-
             if (!text.trim()) return alert('Please paste some text into the box.');
             if (selectedPlatforms.length === 0) return alert('Please select at least one platform.');
-            
             const token = localStorage.getItem('ripple_access_token');
             const resultsEl = document.getElementById('results');
-            
             setButtonLoadingState(generateBtn, true);
             resultsEl.innerHTML = `<article aria-busy="true">Generating your posts, please wait...</article>`;
-            
             try {
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ text, platforms: selectedPlatforms })
                 });
-
+                if (response.status === 403) { // Specifically handle the paywall error
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail);
+                }
                 if (response.status === 401) throw new Error('Your session has expired. Please log in again.');
                 if (!response.ok) throw new Error('An error occurred while generating posts.');
-
                 const data = await response.json();
                 displayPosts(data.posts, resultsEl);
             } catch (error) {
@@ -146,17 +159,14 @@
         }
 
         async function handleViewHistory() {
+            // ... (this function is unchanged)
             toggleView('history');
             const token = localStorage.getItem('ripple_access_token');
             historyListEl.innerHTML = `<article aria-busy="true">Loading history...</article>`;
-
             try {
-                const response = await fetch('/generations', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch('/generations', { headers: { 'Authorization': `Bearer ${token}` } });
                 if (response.status === 401) throw new Error('Your session has expired. Please log in again.');
                 if (!response.ok) throw new Error('Could not fetch history.');
-
                 const historyData = await response.json();
                 displayHistory(historyData, historyListEl);
             } catch (error) {
@@ -164,8 +174,27 @@
                 if (error.message.includes('expired')) handleLogout();
             }
         }
+        
+        // New function to handle the upgrade process
+        async function handleUpgrade() {
+            const token = localStorage.getItem('ripple_access_token');
+            setButtonLoadingState(document.getElementById('upgradeBtn'), true);
+            try {
+                const response = await fetch('/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Could not start the upgrade process.');
+                const data = await response.json();
+                window.location.href = data.url; // Redirect to Stripe
+            } catch (error) {
+                showMessage(error.message, 'red');
+                setButtonLoadingState(document.getElementById('upgradeBtn'), false);
+            }
+        }
 
         function displayHistory(historyData, container) {
+            // ... (this function is unchanged)
             container.innerHTML = '';
             if (historyData.length === 0) {
                 container.innerHTML = '<p>You have no saved generations yet.</p>';
@@ -174,14 +203,11 @@
             historyData.reverse().forEach(item => {
                 const historyArticle = document.createElement('article');
                 historyArticle.className = 'history-item';
-                
                 const originalText = `<p><strong>Original Text:</strong> ${item.original_text.substring(0, 150)}...</p>`;
                 const createdDate = new Date(item.created_at).toLocaleString();
                 const footer = `<footer>Generated on: ${createdDate} for ${item.selected_platforms.join(', ')}</footer>`;
-
                 const postsContainer = document.createElement('div');
                 displayPosts(item.generated_posts.posts, postsContainer);
-                
                 historyArticle.innerHTML = originalText;
                 historyArticle.appendChild(postsContainer);
                 historyArticle.insertAdjacentHTML('beforeend', footer);
@@ -190,20 +216,20 @@
         }
 
         function displayPosts(posts, container) {
+            // ... (this function is unchanged)
             container.innerHTML = ''; 
             posts.forEach(post => {
                 const postArticle = document.createElement('article');
                 postArticle.className = 'post';
-                
                 const platform = `<h3>${post.platform}</h3>`;
                 const content = `<p>${post.content}</p>`;
                 const hashtags = `<footer>${post.hashtags.map(h => `#${h}`).join(' ')}</footer>`;
-                
                 postArticle.innerHTML = platform + content + hashtags;
                 container.appendChild(postArticle);
             });
         }
 
+        // --- Auth & Utility Functions (unchanged) ---
         async function handleLogin(e) { e.preventDefault(); setButtonLoadingState(loginBtn, true); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const formData = new URLSearchParams({ username: email, password: password }); try { const response = await fetch('/token', { method: 'POST', body: formData }); if (!response.ok) throw new Error('Login failed. Please check your credentials.'); const data = await response.json(); localStorage.setItem('ripple_access_token', data.access_token); showMessage('Login successful!', 'green'); checkLoginState(); } catch (error) { showMessage(error.message, 'red'); } finally { setButtonLoadingState(loginBtn, false); } }
         async function handleRegister(e) { e.preventDefault(); setButtonLoadingState(registerBtn, true); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; try { const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.detail || 'Registration failed.'); } showMessage('Registration successful! Please log in.', 'green'); registerForm.reset(); } catch (error) { showMessage(error.message, 'red'); } finally { setButtonLoadingState(registerBtn, false); } }
         function handleLogout() { localStorage.removeItem('ripple_access_token'); showMessage('You have been logged out.', 'green'); checkLoginState(); }
