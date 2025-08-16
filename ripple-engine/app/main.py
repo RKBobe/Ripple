@@ -2,6 +2,7 @@
 import os
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from typing import List
 
 # --- Third-Party Imports ---
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -26,10 +27,7 @@ def create_db_and_tables():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Handles application startup and shutdown events.
-    On startup, it creates the database and tables.
-    """
+    """Handles application startup and shutdown events."""
     print("INFO:     Starting up and creating database tables...")
     create_db_and_tables()
     yield
@@ -38,7 +36,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Ripple API",
     description="An API to generate social media posts from a given text.",
-    version="0.2.0",
+    version="0.3.0", # Version updated for new features
     lifespan=lifespan
 )
 
@@ -51,7 +49,6 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-# OAuth2 scheme definition: tells FastAPI where to get the token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
@@ -89,6 +86,7 @@ async def read_root():
 @app.post("/register", response_model=models.UserPublic)
 def register_user(user_create: models.UserCreate, session: Session = Depends(get_session)):
     """Registers a new user with a hashed password."""
+    # ... (code for this endpoint is unchanged)
     existing_user = session.query(models.User).filter(models.User.email == user_create.email).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
@@ -105,6 +103,7 @@ def register_user(user_create: models.UserCreate, session: Session = Depends(get
 @app.post("/token")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     """Logs in a user and returns a JWT access token."""
+    # ... (code for this endpoint is unchanged)
     user = session.query(models.User).filter(models.User.email == form_data.username).first()
 
     if not user or not security.verify_password(form_data.password, user.hashed_password):
@@ -126,13 +125,33 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
     """(Protected) Fetches details for the currently logged-in user."""
     return current_user
 
+# === MODIFIED ENDPOINT ===
 @app.post("/generate", response_model=dict)
-def generate_posts_endpoint(article: models.Article):
-    """(Protected) Receives an article and returns generated social media posts."""
-    # Note: current_user is now available here if you want to log usage, etc.
-    posts = generator.create_ripples(article.text)
+def generate_posts_endpoint(article: models.Article, current_user: models.User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """
+    (Protected) Receives an article and platform choices, generates posts, and saves the result.
+    """
+    posts = generator.create_ripples(article.text, article.platforms)
     
-    if posts:
-        return {"status": "success", "posts": posts}
-    else:
+    if not posts:
         raise HTTPException(status_code=500, detail="Failed to generate posts from the text.")
+
+    # Save the generation to the database
+    new_generation = models.Generation(
+        original_text=article.text,
+        generated_posts={"posts": posts},
+        selected_platforms=article.platforms,
+        owner_id=current_user.id
+    )
+    session.add(new_generation)
+    session.commit()
+
+    return {"status": "success", "posts": posts}
+
+# === NEW ENDPOINT ===
+@app.get("/generations", response_model=List[models.Generation])
+def get_user_generations(current_user: models.User = Depends(get_current_user)):
+    """(Protected) Fetches all past generations for the current user."""
+    # The 'generations' relationship on the User model is automatically loaded
+    # by SQLModel/SQLAlchemy, so we can just return it.
+    return current_user.generations
