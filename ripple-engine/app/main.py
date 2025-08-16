@@ -127,7 +127,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 @app.post("/generate", response_model=dict)
-def generate_posts_endpoint(article: models.Article, current_user: models.User = Depends(get_current_user)):
+def generate_posts_endpoint(article: models.Article):
     """(Protected) Receives an article and returns generated social media posts."""
     # Note: current_user is now available here if you want to log usage, etc.
     posts = generator.create_ripples(article.text)
