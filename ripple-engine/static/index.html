@@ -94,7 +94,7 @@
         document.getElementById('logoutBtn').addEventListener('click', handleLogout);
         document.getElementById('historyBtn').addEventListener('click', handleViewHistory);
         document.getElementById('backToAppBtn').addEventListener('click', () => toggleView('app'));
-        document.getElementById('upgradeBtn').addEventListener('click', handleUpgrade); // New listener
+        document.getElementById('upgradeBtn').addEventListener('click', handleUpgrade);
 
         // --- View Management ---
         function toggleView(view) {
@@ -109,24 +109,47 @@
 
         function checkLoginState() {
             const token = localStorage.getItem('ripple_access_token');
-            toggleView(token ? 'app' : 'auth');
-            // Check for checkout status from URL
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.has('checkout_status')) {
-                const status = urlParams.get('checkout_status');
-                if (status === 'success') {
-                    showMessage('Upgrade successful! Welcome to Pro.', 'green');
-                } else {
-                    showMessage('Upgrade canceled. You can upgrade anytime.', 'red');
-                }
-                // Clean the URL
+
+            if (urlParams.has('checkout_status') && urlParams.get('checkout_status') === 'success' && token) {
+                showMessage('Verifying your upgrade, please wait...', 'blue');
+                toggleView('app');
+                pollUserStatus(token);
                 window.history.replaceState({}, document.title, "/");
+            } else if (urlParams.has('checkout_status') && urlParams.get('checkout_status') === 'cancel') {
+                showMessage('Upgrade canceled. You can upgrade anytime.', 'red');
+                toggleView(token ? 'app' : 'auth');
+                window.history.replaceState({}, document.title, "/");
+            } else {
+                toggleView(token ? 'app' : 'auth');
             }
+        }
+
+        function pollUserStatus(token, attempts = 0) {
+            if (attempts >= 10) {
+                showMessage('Could not verify upgrade. Please refresh the page.', 'red');
+                return;
+            }
+
+            setTimeout(async () => {
+                try {
+                    const response = await fetch('/users/me', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) throw new Error();
+                    const userData = await response.json();
+
+                    if (userData.subscription_status === 'pro') {
+                        showMessage('Upgrade successful! Welcome to Pro.', 'green');
+                    } else {
+                        pollUserStatus(token, attempts + 1);
+                    }
+                } catch (error) {
+                    showMessage('Error verifying upgrade. Please refresh.', 'red');
+                }
+            }, 2000);
         }
         
         // --- API & Event Handlers ---
         async function handleGenerate() {
-            // ... (this function is unchanged)
             const text = document.getElementById('articleText').value;
             const selectedPlatforms = Array.from(document.querySelectorAll('input[name="platform"]:checked')).map(cb => cb.value);
             if (!text.trim()) return alert('Please paste some text into the box.');
@@ -141,7 +164,7 @@
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                     body: JSON.stringify({ text, platforms: selectedPlatforms })
                 });
-                if (response.status === 403) { // Specifically handle the paywall error
+                if (response.status === 403) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail);
                 }
@@ -159,7 +182,6 @@
         }
 
         async function handleViewHistory() {
-            // ... (this function is unchanged)
             toggleView('history');
             const token = localStorage.getItem('ripple_access_token');
             historyListEl.innerHTML = `<article aria-busy="true">Loading history...</article>`;
@@ -175,7 +197,6 @@
             }
         }
         
-        // New function to handle the upgrade process
         async function handleUpgrade() {
             const token = localStorage.getItem('ripple_access_token');
             setButtonLoadingState(document.getElementById('upgradeBtn'), true);
@@ -186,7 +207,7 @@
                 });
                 if (!response.ok) throw new Error('Could not start the upgrade process.');
                 const data = await response.json();
-                window.location.href = data.url; // Redirect to Stripe
+                window.location.href = data.url;
             } catch (error) {
                 showMessage(error.message, 'red');
                 setButtonLoadingState(document.getElementById('upgradeBtn'), false);
@@ -194,7 +215,6 @@
         }
 
         function displayHistory(historyData, container) {
-            // ... (this function is unchanged)
             container.innerHTML = '';
             if (historyData.length === 0) {
                 container.innerHTML = '<p>You have no saved generations yet.</p>';
@@ -216,7 +236,6 @@
         }
 
         function displayPosts(posts, container) {
-            // ... (this function is unchanged)
             container.innerHTML = ''; 
             posts.forEach(post => {
                 const postArticle = document.createElement('article');
@@ -229,7 +248,7 @@
             });
         }
 
-        // --- Auth & Utility Functions (unchanged) ---
+        // --- Auth & Utility Functions ---
         async function handleLogin(e) { e.preventDefault(); setButtonLoadingState(loginBtn, true); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const formData = new URLSearchParams({ username: email, password: password }); try { const response = await fetch('/token', { method: 'POST', body: formData }); if (!response.ok) throw new Error('Login failed. Please check your credentials.'); const data = await response.json(); localStorage.setItem('ripple_access_token', data.access_token); showMessage('Login successful!', 'green'); checkLoginState(); } catch (error) { showMessage(error.message, 'red'); } finally { setButtonLoadingState(loginBtn, false); } }
         async function handleRegister(e) { e.preventDefault(); setButtonLoadingState(registerBtn, true); const email = document.getElementById('register-email').value; const password = document.getElementById('register-password').value; try { const response = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.detail || 'Registration failed.'); } showMessage('Registration successful! Please log in.', 'green'); registerForm.reset(); } catch (error) { showMessage(error.message, 'red'); } finally { setButtonLoadingState(registerBtn, false); } }
         function handleLogout() { localStorage.removeItem('ripple_access_token'); showMessage('You have been logged out.', 'green'); checkLoginState(); }
